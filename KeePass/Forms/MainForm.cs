@@ -24,6 +24,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Media;
 using System.Security;
 using System.Text;
@@ -868,9 +869,11 @@ namespace KeePass.Forms
 				true, this, pe, m_docMgr.SafeFindContainerOf(pe)))
 				StartClipboardCountdown();
 		}
-
+        
 		private void OnEntryCopyPassword(object sender, EventArgs e)
 		{
+            if (!IsAllowedToCopyPassword()) return;
+
 			PwEntry pe = GetSelectedEntry(false);
 			Debug.Assert(pe != null); if(pe == null) return;
 
@@ -884,6 +887,35 @@ namespace KeePass.Forms
 				true, this, pe, m_docMgr.SafeFindContainerOf(pe)))
 				StartClipboardCountdown();
 		}
+
+        private bool IsAllowedToCopyPassword()
+        {
+            SetStatusEx("Fingerprint verification...");
+
+            HttpWebResponse response = null;
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create("http://raspberrypi.fritz.box");
+                request.Method = "GET";
+
+                response = (HttpWebResponse)request.GetResponse();
+            } catch (WebException e)
+            {
+                if (e.Status == WebExceptionStatus.ProtocolError)
+                {
+                    response = (HttpWebResponse)e.Response;
+                    Console.Write("Errorcode: {0}", (int)response.StatusCode);
+                }
+                else
+                {
+                    Console.Write("Error: {0}", e.Status);
+                }
+                SetStatusEx("Fingerprint verification FAILED, denied access to password");
+                return false;
+            }
+
+            return response != null && response.StatusCode == HttpStatusCode.OK;
+        }
 
 		private void OnEntryOpenUrl(object sender, EventArgs e)
 		{
